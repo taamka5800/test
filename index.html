@@ -134,6 +134,20 @@
             color: #fff;
             background: #27acd9;
         }
+        /* くるくるアニメーション */
+        .spinner {
+            border: 8px solid #e0f7fa;
+            border-top: 8px solid #27acd9;
+            border-radius: 50%;
+            width: 64px;
+            height: 64px;
+            animation: spin 1s linear infinite;
+            margin: auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg);}
+            100% { transform: rotate(360deg);}
+        }
     </style>
 </head>
 <body>
@@ -148,6 +162,12 @@
                 <option value="10">10月</option>
             </select>
         </label>
+    </div>
+    <div id="loading" style="display:none; position:fixed; z-index:9999; top:0; left:0; width:100vw; height:100vh; background:rgba(255,255,255,0.7);">
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
+            <div class="spinner"></div>
+            <div style="margin-top:18px; color:#27acd9; font-size:1.3em;">Loading...</div>
+        </div>
     </div>
     <div id="calendar"></div>
     <div style="padding-top: 25px;">
@@ -261,25 +281,36 @@
         const monthSelect = document.getElementById('monthSelect');
         let targetDays = [];
 
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
         async function updateCalendar() {
             const month = parseInt(monthSelect.value, 10);
             // 0埋め2桁にする
             const monthStr = ('0' + month).slice(-2);
 
+            // ローディング表示
+            document.getElementById('loading').style.display = 'block';
+
             // GET通信
             try {
                 const dayStrs = targetDays.filter(day => day.startsWith(`${year}-${monthStr}`));
-                for (const dayStr of dayStrs) {
-                    if (!resultMap.has(`${dayStr}`)) {
+                const fetchPromises = dayStrs
+                    .filter(dayStr => !resultMap.has(dayStr))
+                    .map(async dayStr => {
                         const response = await fetch(`https://ebicaapi-for-booking.ebica.jp/booking/v2_1/stocks?shop_id=34195&sitecd=e014001556&reservation_date=${dayStr}&_=175120092`);
                         const data = await response.json();
                         console.log('GET通信結果:', data);
-                        resultMap.set(`${dayStr}`, data);
-                    }
-                }
+                        resultMap.set(dayStr, data);
+                    });
+                await Promise.all(fetchPromises);
             } catch (error) {
                 console.error('GET通信エラー:', error);
             }
+            // ローディング非表示
+            document.getElementById('loading').style.display = 'none';
+
+            // カレンダー更新
             document.getElementById('calendar').innerHTML = createCalendar(year, month);
 
             // 〇クリック時のイベント設定
