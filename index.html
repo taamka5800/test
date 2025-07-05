@@ -228,21 +228,23 @@
                 html += '<tr>';
                 for (let col = 0; col < 7; col++) {
                     const d = weeks[row][col];
-                    if (d == 28) {
-                        const a = '';
+                    if (!d) {
+                        html += `<td><div></div><div></div></td>`;
+                        continue;
                     }
+
                     const dayStr = ('0' + d).slice(-2);
-                    const stocks = resultMap.get(`${year}-${monthStr}-${dayStr}`)?.stocks || [];
+                    const stocks = resultMap.get(`${year}-${monthStr}-${dayStr}`)?.stocks;
+                    if (!stocks) {
+                        html += `<td><div>${d}</div><div>-</div></td>`;
+                        continue;
+                    }
                     const twoOk = stocks.find(stock => stock.headcount === 2)?.times.some(time => time.sets >= 1);
                     const threeOk = stocks.find(stock => stock.headcount === 3)?.times.some(time => time.sets >= 1);
                     const fourOk = stocks.find(stock => stock.headcount === 4)?.times.some(time => time.sets >= 1);
                     const okStr = twoOk ? '◎' : (threeOk | fourOk ? '〇' : '✕');
                     const okClass = twoOk ? 'green' : (threeOk | fourOk ? 'aqua' : 'red');
-                    if (d) {
-                        html += `<td><div>${d}</div><div class="${okClass}" data-day="${d}">${okStr}</div></td>`;
-                    } else {
-                        html += `<td><div></div><div></div></td>`;
-                    }
+                    html += `<td><div>${d}</div><div class="${okClass}" data-day="${d}">${okStr}</div></td>`;
                 }
                 html += '</tr>';
             }
