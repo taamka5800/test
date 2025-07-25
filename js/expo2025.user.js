@@ -41,6 +41,10 @@
                 padding: 0;
                 min-width: 350px;
                 max-width: 80%;
+                max-height: 80vh;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
                 box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
                 transition: transform 0.3s ease;
             `;
@@ -55,12 +59,16 @@
                 user-select: none;
                 border-bottom: 1px solid #dee2e6;
                 position: relative;
+                flex-shrink: 0;
             `;
             
             // ダイアログボディを作成
             const dialogBody = document.createElement('div');
             dialogBody.style.cssText = `
                 padding: 30px;
+                overflow-y: auto;
+                flex: 1;
+                min-height: 0;
             `;
             
             // ダイアログの内容
@@ -127,7 +135,41 @@
             let isDragging = false;
             let dragOffset = { x: 0, y: 0 };
             
+            // 背景スクロールを無効化
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+            
+            // タッチイベントの伝播を防ぐ
+            overlay.addEventListener('touchmove', function(e) {
+                // ドラッグ中でない場合のみ背景スクロールを防ぐ
+                if (!isDragging) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
+            // ダイアログ内のタッチイベントは通常通り動作させる（スクロール可能エリア以外）
+            dialog.addEventListener('touchmove', function(e) {
+                // ドラッグ中の場合は処理をスキップ
+                if (isDragging) {
+                    return;
+                }
+                
+                // スクロール可能エリア内でない場合のみ伝播を停止
+                const target = e.target;
+                const scrollableElement = target.closest('#event-list');
+                if (!scrollableElement) {
+                    e.stopPropagation();
+                }
+            });
+            
+            // マウスイベント（PC用）
             dialogHeader.addEventListener('mousedown', function(e) {
+                // ✕ボタンの場合はドラッグを開始しない
+                if (e.target.closest('#event-close-button')) {
+                    return;
+                }
+                
                 isDragging = true;
                 const rect = dialog.getBoundingClientRect();
                 dragOffset.x = e.clientX - rect.left;
@@ -135,6 +177,23 @@
                 dialog.style.transition = 'none';
                 e.preventDefault();
             });
+            
+            // タッチイベント（スマホ用）
+            dialogHeader.addEventListener('touchstart', function(e) {
+                // ✕ボタンの場合はドラッグを開始しない
+                if (e.target.closest('#event-close-button')) {
+                    return;
+                }
+                
+                isDragging = true;
+                const rect = dialog.getBoundingClientRect();
+                const touch = e.touches[0];
+                dragOffset.x = touch.clientX - rect.left;
+                dragOffset.y = touch.clientY - rect.top;
+                dialog.style.transition = 'none';
+                e.preventDefault();
+                e.stopPropagation();
+            }, { passive: false });
             
             document.addEventListener('mousemove', function(e) {
                 if (isDragging) {
@@ -146,7 +205,28 @@
                 }
             });
             
+            // タッチムーブイベント（スマホ用）
+            document.addEventListener('touchmove', function(e) {
+                if (isDragging) {
+                    const touch = e.touches[0];
+                    const x = touch.clientX - dragOffset.x;
+                    const y = touch.clientY - dragOffset.y;
+                    dialog.style.left = `${x}px`;
+                    dialog.style.top = `${y}px`;
+                    dialog.style.transform = 'none';
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
             document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    dialog.style.transition = 'transform 0.3s ease';
+                }
+            });
+            
+            // タッチエンドイベント（スマホ用）
+            document.addEventListener('touchend', function() {
                 if (isDragging) {
                     isDragging = false;
                     dialog.style.transition = 'transform 0.3s ease';
@@ -306,6 +386,11 @@
             
             // クローズイベントを追加
             const closeEventDialog = function() {
+                // 背景スクロールを復元
+                document.body.style.overflow = '';
+                document.body.style.position = '';
+                document.body.style.width = '';
+                
                 overlay.style.opacity = '0';
                 dialog.style.transform = 'translate(-50%, -50%) scale(0.8)';
                 setTimeout(() => {
@@ -378,6 +463,16 @@
                 this.style.transform = 'translateY(-50%) scale(1)';
             });
             
+            // ✕ボタンのタッチイベントを追加（スマホ対応）
+            eventCloseButton.addEventListener('touchstart', function(e) {
+                e.stopPropagation();
+            }, { passive: true });
+            eventCloseButton.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeEventDialog();
+            }, { passive: false });
+            
             // オーバーレイクリックで閉じる
             overlay.addEventListener('click', function(e) {
                 if (e.target === overlay) {
@@ -435,6 +530,10 @@
                 padding: 0;
                 min-width: 400px;
                 max-width: 80%;
+                max-height: 80vh;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
                 box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
                 transition: transform 0.3s ease;
             `;
@@ -449,12 +548,16 @@
                 user-select: none;
                 border-bottom: 1px solid #dee2e6;
                 position: relative;
+                flex-shrink: 0;
             `;
             
             // ダイアログボディを作成
             const dialogBody = document.createElement('div');
             dialogBody.style.cssText = `
                 padding: 30px;
+                overflow-y: auto;
+                flex: 1;
+                min-height: 0;
             `;
             
             // ダイアログの内容
@@ -494,7 +597,7 @@
                             <label style="display: block; margin-bottom: 5px; color: #555; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;">入場日</label>
                             <input type="date" id="config-entrance-date" 
                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif; box-sizing: border-box;"
-                                   value="${new Date().toISOString().split('T')[0]}">
+                                   value="${window.savedEntranceDate || new Date().toISOString().split('T')[0]}">
                         </div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; color: #555; font-family: Arial, sans-serif;">
                             <span>自動取得</span>
@@ -599,7 +702,34 @@
             let isDragging = false;
             let dragOffset = { x: 0, y: 0 };
             
+            // 背景スクロールを無効化
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+            
+            // タッチイベントの伝播を防ぐ
+            overlay.addEventListener('touchmove', function(e) {
+                // ドラッグ中でない場合のみ背景スクロールを防ぐ
+                if (!isDragging) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
+            // ダイアログ内のタッチイベントは通常通り動作させる
+            dialog.addEventListener('touchmove', function(e) {
+                // ドラッグ中の場合は処理をスキップ
+                if (!isDragging) {
+                    e.stopPropagation();
+                }
+            });
+            
+            // マウスイベント（PC用）
             dialogHeader.addEventListener('mousedown', function(e) {
+                // ✕ボタンの場合はドラッグを開始しない
+                if (e.target.closest('#settings-close-button')) {
+                    return;
+                }
+                
                 isDragging = true;
                 const rect = dialog.getBoundingClientRect();
                 dragOffset.x = e.clientX - rect.left;
@@ -607,6 +737,23 @@
                 dialog.style.transition = 'none';
                 e.preventDefault();
             });
+            
+            // タッチイベント（スマホ用）
+            dialogHeader.addEventListener('touchstart', function(e) {
+                // ✕ボタンの場合はドラッグを開始しない
+                if (e.target.closest('#settings-close-button')) {
+                    return;
+                }
+                
+                isDragging = true;
+                const rect = dialog.getBoundingClientRect();
+                const touch = e.touches[0];
+                dragOffset.x = touch.clientX - rect.left;
+                dragOffset.y = touch.clientY - rect.top;
+                dialog.style.transition = 'none';
+                e.preventDefault();
+                e.stopPropagation();
+            }, { passive: false });
             
             document.addEventListener('mousemove', function(e) {
                 if (isDragging) {
@@ -618,7 +765,28 @@
                 }
             });
             
+            // タッチムーブイベント（スマホ用）
+            document.addEventListener('touchmove', function(e) {
+                if (isDragging) {
+                    const touch = e.touches[0];
+                    const x = touch.clientX - dragOffset.x;
+                    const y = touch.clientY - dragOffset.y;
+                    dialog.style.left = `${x}px`;
+                    dialog.style.top = `${y}px`;
+                    dialog.style.transform = 'none';
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
             document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    dialog.style.transition = 'transform 0.3s ease';
+                }
+            });
+            
+            // タッチエンドイベント（スマホ用）
+            document.addEventListener('touchend', function() {
                 if (isDragging) {
                     isDragging = false;
                     dialog.style.transition = 'transform 0.3s ease';
@@ -667,6 +835,11 @@
             
             // クローズイベントを追加
             const closeSettingsDialog = function() {
+                // 背景スクロールを復元
+                document.body.style.overflow = '';
+                document.body.style.position = '';
+                document.body.style.width = '';
+                
                 overlay.style.opacity = '0';
                 dialog.style.transform = 'translate(-50%, -50%) scale(0.8)';
                 setTimeout(() => {
@@ -683,9 +856,10 @@
                 window.savedTicketId = ticketIdInput.value.trim();
                 localStorage.setItem('savedTicketId', window.savedTicketId);
                 
-                // 入場日は常に現在日を使用（保存しない）
+                // 入場日の値を保存
                 const entranceDateInput = dialog.querySelector('#config-entrance-date');
-                window.savedEntranceDate = new Date().toISOString().split('T')[0];
+                window.savedEntranceDate = entranceDateInput.value || new Date().toISOString().split('T')[0];
+                localStorage.setItem('savedEntranceDate', window.savedEntranceDate);
                 
                 // 取得間隔の値を保存
                 const intervalInput = dialog.querySelector('#config-interval');
@@ -746,6 +920,16 @@
                 this.style.transform = 'translateY(-50%) scale(1)';
             });
             
+            // ✕ボタンのタッチイベントを追加（スマホ対応）
+            closeButton.addEventListener('touchstart', function(e) {
+                e.stopPropagation();
+            }, { passive: true });
+            closeButton.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeSettingsDialog();
+            }, { passive: false });
+            
             // オーバーレイクリックで閉じる
             overlay.addEventListener('click', function(e) {
                 if (e.target === overlay) {
@@ -797,8 +981,13 @@
                 window.savedTicketId = window.savedTicketId || 'HSFVPTPHG4,4C6JQHSEXZ';
             }
             
-            // 入場日を保持するグローバル変数（常に現在日を使用）
-            window.savedEntranceDate = new Date().toISOString().split('T')[0];
+            // 入場日を保持するグローバル変数（ローカルストレージから復元）
+            try {
+                const savedEntranceDate = localStorage.getItem('savedEntranceDate');
+                window.savedEntranceDate = savedEntranceDate !== null ? savedEntranceDate : new Date().toISOString().split('T')[0];
+            } catch (e) {
+                window.savedEntranceDate = new Date().toISOString().split('T')[0];
+            }
             
             // 現在時刻以降フィルターを保持するグローバル変数（ローカルストレージから復元）
             try {
@@ -1614,6 +1803,10 @@
                 padding: 0;
                 min-width: 400px;
                 max-width: 90%;
+                max-height: 80vh;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
                 box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
                 transition: transform 0.3s ease;
                 z-index: 10001;
@@ -1629,12 +1822,16 @@
                 user-select: none;
                 border-bottom: 1px solid #dee2e6;
                 position: relative;
+                flex-shrink: 0;
             `;
             
             // ダイアログボディを作成
             const dialogBody = document.createElement('div');
             dialogBody.style.cssText = `
                 padding: 15px;
+                overflow-y: auto;
+                flex: 1;
+                min-height: 0;
             `;
             
             // ダイアログの内容
@@ -1757,7 +1954,57 @@
             let isDragging = false;
             let dragOffset = { x: 0, y: 0 };
             
+            // 背景スクロールを無効化
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+            
+            // タッチイベントの伝播を防ぐ
+            overlay.addEventListener('touchmove', function(e) {
+                // ドラッグ中でない場合のみ背景スクロールを防ぐ
+                if (!isDragging) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
+            // ダイアログ内のタッチイベントは通常通り動作させる（スクロール可能エリア以外）
+            dialog.addEventListener('touchmove', function(e) {
+                // ドラッグ中の場合は処理をスキップ
+                if (isDragging) {
+                    return;
+                }
+                
+                // スクロール可能エリア内の場合は通常のスクロール動作を許可
+                const target = e.target;
+                const scrollableElement = target.closest('#event-schedule-table, #generated-urls, #api-result');
+                if (!scrollableElement) {
+                    e.stopPropagation();
+                }
+            }, { passive: true });
+            
+            // スクロール可能エリアでのタッチイベントを明示的に処理
+            const scrollableAreas = dialog.querySelectorAll('#event-schedule-table, #generated-urls, #api-result');
+            scrollableAreas.forEach(area => {
+                area.addEventListener('touchstart', function(e) {
+                    e.stopPropagation();
+                }, { passive: true });
+                
+                area.addEventListener('touchmove', function(e) {
+                    e.stopPropagation();
+                }, { passive: true });
+                
+                area.addEventListener('touchend', function(e) {
+                    e.stopPropagation();
+                }, { passive: true });
+            });
+            
+            // マウスイベント（PC用）
             dialogHeader.addEventListener('mousedown', function(e) {
+                // ✕ボタンの場合はドラッグを開始しない
+                if (e.target.closest('#close-button')) {
+                    return;
+                }
+                
                 isDragging = true;
                 const rect = dialog.getBoundingClientRect();
                 dragOffset.x = e.clientX - rect.left;
@@ -1765,6 +2012,23 @@
                 dialog.style.transition = 'none';
                 e.preventDefault();
             });
+            
+            // タッチイベント（スマホ用）
+            dialogHeader.addEventListener('touchstart', function(e) {
+                // ✕ボタンの場合はドラッグを開始しない
+                if (e.target.closest('#close-button')) {
+                    return;
+                }
+                
+                isDragging = true;
+                const rect = dialog.getBoundingClientRect();
+                const touch = e.touches[0];
+                dragOffset.x = touch.clientX - rect.left;
+                dragOffset.y = touch.clientY - rect.top;
+                dialog.style.transition = 'none';
+                e.preventDefault();
+                e.stopPropagation();
+            }, { passive: false });
             
             document.addEventListener('mousemove', function(e) {
                 if (isDragging) {
@@ -1776,7 +2040,28 @@
                 }
             });
             
+            // タッチムーブイベント（スマホ用）
+            document.addEventListener('touchmove', function(e) {
+                if (isDragging) {
+                    const touch = e.touches[0];
+                    const x = touch.clientX - dragOffset.x;
+                    const y = touch.clientY - dragOffset.y;
+                    dialog.style.left = `${x}px`;
+                    dialog.style.top = `${y}px`;
+                    dialog.style.transform = 'none';
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
             document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    dialog.style.transition = 'transform 0.3s ease';
+                }
+            });
+            
+            // タッチエンドイベント（スマホ用）
+            document.addEventListener('touchend', function() {
                 if (isDragging) {
                     isDragging = false;
                     dialog.style.transition = 'transform 0.3s ease';
@@ -1873,6 +2158,11 @@
                 if (window.stopAutoReload) {
                     window.stopAutoReload();
                 }
+                
+                // 背景スクロールを復元
+                document.body.style.overflow = '';
+                document.body.style.position = '';
+                document.body.style.width = '';
                 
                 overlay.style.opacity = '0';
                 dialog.style.transform = 'translate(-50%, -50%) scale(0.8)';
@@ -2121,6 +2411,16 @@
                 this.style.backgroundColor = '#dc3545';
                 this.style.transform = 'translateY(-50%) scale(1)';
             });
+            
+            // ✕ボタンのタッチイベントを追加（スマホ対応）
+            closeButton.addEventListener('touchstart', function(e) {
+                e.stopPropagation();
+            }, { passive: true });
+            closeButton.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeDialog();
+            }, { passive: false });
 
             // オーバーレイクリックで閉じる
             overlay.addEventListener('click', function(e) {
