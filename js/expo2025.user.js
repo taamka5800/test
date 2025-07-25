@@ -41,7 +41,7 @@
                 padding: 0;
                 min-width: 350px;
                 max-width: 80%;
-                max-height: 85vh;
+                max-height: 90vh;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
@@ -98,8 +98,8 @@
             
             dialogBody.innerHTML = `
                     </div>
-                    <div style="margin-bottom: 20px; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 15px;">
-                        <div id="event-list">
+                    <div style="margin-bottom: 20px; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 15px; -webkit-overflow-scrolling: touch;">
+                        <div id="event-list" style="overflow-y: auto; -webkit-overflow-scrolling: touch;">
                             <!-- イベントリストはJavaScriptで動的に生成 -->
                         </div>
                     </div>
@@ -155,12 +155,28 @@
                     return;
                 }
                 
-                // スクロール可能エリア内でない場合のみ伝播を停止
+                // スクロール可能エリア内の場合は通常のスクロール動作を許可
                 const target = e.target;
                 const scrollableElement = target.closest('#event-list');
                 if (!scrollableElement) {
                     e.stopPropagation();
                 }
+            });
+            
+            // スクロール可能エリアでのタッチイベントを明示的に処理
+            const scrollableAreas = dialog.querySelectorAll('#event-list');
+            scrollableAreas.forEach(area => {
+                area.addEventListener('touchstart', function(e) {
+                    e.stopPropagation();
+                }, { passive: true });
+                
+                area.addEventListener('touchmove', function(e) {
+                    e.stopPropagation();
+                }, { passive: true });
+                
+                area.addEventListener('touchend', function(e) {
+                    e.stopPropagation();
+                }, { passive: true });
             });
             
             // マウスイベント（PC用）
@@ -384,6 +400,41 @@
                 });
             });
             
+            // スクロール可能エリアのタッチスクロール最適化（イベントリスト生成後に実行）
+            setTimeout(() => {
+                const eventListElement = dialog.querySelector('#event-list');
+                if (eventListElement) {
+                    // スクロール可能エリア内でのタッチイベントを最適化
+                    eventListElement.addEventListener('touchstart', function(e) {
+                        e.stopPropagation();
+                    }, { passive: true });
+                    
+                    eventListElement.addEventListener('touchmove', function(e) {
+                        e.stopPropagation();
+                    }, { passive: true });
+                    
+                    eventListElement.addEventListener('touchend', function(e) {
+                        e.stopPropagation();
+                    }, { passive: true });
+                    
+                    // 親コンテナも同様に処理
+                    const scrollableContainer = eventListElement.parentElement;
+                    if (scrollableContainer) {
+                        scrollableContainer.addEventListener('touchstart', function(e) {
+                            e.stopPropagation();
+                        }, { passive: true });
+                        
+                        scrollableContainer.addEventListener('touchmove', function(e) {
+                            e.stopPropagation();
+                        }, { passive: true });
+                        
+                        scrollableContainer.addEventListener('touchend', function(e) {
+                            e.stopPropagation();
+                        }, { passive: true });
+                    }
+                }
+            }, 10);
+            
             // クローズイベントを追加
             const closeEventDialog = function() {
                 // 背景スクロールを復元
@@ -530,7 +581,7 @@
                 padding: 0;
                 min-width: 400px;
                 max-width: 80%;
-                max-height: 85vh;
+                max-height: 90vh;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
@@ -1803,7 +1854,7 @@
                 padding: 0;
                 min-width: 400px;
                 max-width: 90%;
-                max-height: 85vh;
+                max-height: 90vh;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
