@@ -1074,8 +1074,16 @@
             
             // 自動取得タイマーを保持するグローバル変数
             window.autoReloadTimer = window.autoReloadTimer || null;
-            // 自動予約の状態を保持するグローバル変数
-            window.autoReserveStates = window.autoReserveStates || {};
+            
+            // 自動予約の状態を保持するグローバル変数（ローカルストレージから復元）
+            try {
+                const savedAutoReserveStates = localStorage.getItem('autoReserveStates');
+                window.autoReserveStates = savedAutoReserveStates !== null ? JSON.parse(savedAutoReserveStates) : (window.autoReserveStates || {});
+                console.log('🔄 自動予約状態をローカルストレージから復元:', window.autoReserveStates);
+            } catch (e) {
+                console.warn('自動予約状態の復元に失敗:', e);
+                window.autoReserveStates = window.autoReserveStates || {};
+            }
             
             // 時間スロットを生成（9:00から21:00まで15分間隔）
             function generateTimeSlots() {
@@ -1160,10 +1168,27 @@
             // 自動予約の切り替え機能
             window.toggleAutoReserve = function(eventIndex, checked) {
                 const events = window.selectedEventsForSchedule || [];
+                console.log(`🔄 toggleAutoReserve 呼び出し: eventIndex=${eventIndex}, checked=${checked}`);
+                console.log(`📊 現在のイベント数: ${events.length}`);
+                console.log(`📊 現在の自動予約状態:`, window.autoReserveStates);
+                
                 if (eventIndex < events.length) {
                     const eventCode = events[eventIndex].event_code;
+                    const eventName = events[eventIndex].event_name;
                     window.autoReserveStates[eventCode] = checked;
-                    console.log(`自動予約 ${events[eventIndex].event_name}: ${checked ? 'ON' : 'OFF'}`);
+                    
+                    // ローカルストレージに保存
+                    try {
+                        localStorage.setItem('autoReserveStates', JSON.stringify(window.autoReserveStates));
+                        console.log(`💾 自動予約状態をローカルストレージに保存しました`);
+                    } catch (e) {
+                        console.warn('自動予約状態の保存に失敗:', e);
+                    }
+                    
+                    console.log(`✅ 自動予約設定更新: ${eventName} (${eventCode}) → ${checked ? 'ON' : 'OFF'}`);
+                    console.log(`📊 更新後の自動予約状態:`, window.autoReserveStates);
+                } else {
+                    console.log(`❌ 無効なeventIndex: ${eventIndex} (events.length: ${events.length})`);
                 }
             };
             
@@ -1251,13 +1276,18 @@
                 tableContainer.innerHTML = tableHTML;
                 
                 // 自動予約チェックボックスの状態を復元
+                console.log('🔄 自動予約チェックボックスの状態を復元中...');
                 events.forEach((event, eventIndex) => {
                     const checkbox = document.getElementById(`auto-reserve-${eventIndex}`);
                     if (checkbox) {
                         const isChecked = window.autoReserveStates[event.event_code] || false;
                         checkbox.checked = isChecked;
+                        console.log(`✅ チェックボックス復元: ${event.event_name} (index=${eventIndex}) → ${isChecked ? 'ON' : 'OFF'}`);
+                    } else {
+                        console.log(`❌ チェックボックスが見つかりません: auto-reserve-${eventIndex}`);
                     }
                 });
+                console.log('✅ 自動予約チェックボックス復元完了');
             }
             
             // 時間を分に変換する関数
@@ -1343,6 +1373,9 @@
                 // セルスケジュールデータをグローバルに保存
                 window.cellScheduleData = cellScheduleData;
                 
+                console.log('📊 テーブル更新完了、自動予約処理を開始します');
+                console.log('📊 セルスケジュールデータ数:', Object.keys(cellScheduleData).length);
+                
                 // 自動予約処理を実行
                 executeAutoReservation();
             }
@@ -1352,6 +1385,10 @@
                 const events = window.selectedEventsForSchedule || [];
                 const timeSlots = generateTimeSlots();
                 
+                console.log('🤖 自動予約処理を開始します');
+                console.log('選択されたイベント数:', events.length);
+                console.log('自動予約状態:', window.autoReserveStates);
+                
                 // 現在時刻と自動予約範囲時間を取得
                 const now = new Date();
                 const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
@@ -1360,7 +1397,11 @@
                 const autoReserveRangeMinutes = autoReserveHours * 60 + autoReserveMinutes;
                 const endTimeMinutes = currentTimeMinutes + autoReserveRangeMinutes;
                 
+                console.log(`現在時刻: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`);
+                console.log(`自動予約範囲: ${Math.floor(endTimeMinutes / 60)}:${(endTimeMinutes % 60).toString().padStart(2, '0')}まで`);
+                
                 // 自動予約が有効なイベントをチェック
+                let autoReserveEnabledCount = 0;
                 for (let eventIndex = 0; eventIndex < events.length; eventIndex++) {
                     const event = events[eventIndex];
                     const isAutoReserveEnabled = window.autoReserveStates[event.event_code] || false;
@@ -1369,9 +1410,13 @@
                         continue; // 自動予約が無効な場合はスキップ
                     }
                     
-                    console.log(`自動予約処理開始: ${event.event_name}`);
+                    autoReserveEnabledCount++;
+                    
+                    autoReserveEnabledCount++;
+                    console.log(`自動予約処理開始: ${event.event_name} (${event.event_code})`);
                     
                     // 時間スロットを順番に処理（直列実行）
+                    let availableSlotsCount = 0;
                     for (let timeIndex = 0; timeIndex < timeSlots.length; timeIndex++) {
                         const timeSlot = timeSlots[timeIndex];
                         const [hours, minutes] = timeSlot.split(':').map(Number);
@@ -1392,37 +1437,82 @@
                         const hasAvailableSchedule = cellContent.includes('○') || cellContent.includes('△');
                         
                         if (hasAvailableSchedule) {
-                            console.log(`自動予約実行: ${event.event_name} - ${timeSlot}`);
+                            availableSlotsCount++;
+                            console.log(`🎯 利用可能スロット発見: ${event.event_name} - ${timeSlot} (${cellId})`);
+                            console.log(`セル内容:`, cellContent.substring(0, 100));
                             
                             try {
                                 // showScheduleKeys関数を呼び出して予約処理を実行
+                                console.log(`📤 予約API実行開始: ${timeSlot}`);
                                 const reservationResult = await executeReservationForAutoReserve(cellId);
                                 
                                 if (reservationResult.success) {
-                                    console.log(`自動予約成功: ${event.event_name} - ${timeSlot}`);
+                                    console.log(`✅ 自動予約成功: ${event.event_name} - ${timeSlot}`);
+                                    console.log(`📊 成功件数: ${reservationResult.successCount}件`);
                                     
                                     // 予約成功時は全ての自動予約チェックを外す
                                     clearAllAutoReserveStates();
                                     
-                                    // 成功メッセージを表示
-                                    alert(`🎉 自動予約が完了しました！\n\nイベント: ${event.event_name}\n時間: ${timeSlot}\n\n全ての自動予約を無効にしました。`);
+                                    // 詳細な成功メッセージを表示
+                                    let successMessage = `🎉 自動予約が完了しました！\n\n`;
+                                    successMessage += `イベント: ${event.event_name}\n`;
+                                    successMessage += `時間スロット: ${timeSlot}\n`;
+                                    successMessage += `成功件数: ${reservationResult.successCount}件\n\n`;
+                                    
+                                    if (reservationResult.results) {
+                                        const status200Results = reservationResult.results.filter(r => r.status === 200);
+                                        if (status200Results.length > 0) {
+                                            successMessage += `予約完了時間:\n`;
+                                            status200Results.forEach((result) => {
+                                                successMessage += `✓ ${result.startTime} (${result.timeKey})\n`;
+                                            });
+                                            successMessage += `\n`;
+                                        }
+                                    }
+                                    
+                                    successMessage += `全ての自動予約を無効にしました。\n詳細は結果ログをご確認ください。`;
+                                    
+                                    alert(successMessage);
                                     
                                     return; // 成功したら処理を終了
+                                } else {
+                                    console.log(`❌ 自動予約失敗: ${event.event_name} - ${timeSlot}`, reservationResult.error);
+                                    
+                                    // 失敗時でも結果ログを表示（既にshowAutoReserveResultsで表示済み）
+                                    if (reservationResult.results) {
+                                        const failedCount = reservationResult.results.filter(r => !r.success).length;
+                                        console.log(`📊 失敗詳細: ${failedCount}件のAPI呼び出しが失敗`);
+                                    }
                                 }
                             } catch (error) {
-                                console.error(`自動予約エラー: ${event.event_name} - ${timeSlot}`, error);
+                                console.error(`💥 自動予約エラー: ${event.event_name} - ${timeSlot}`, error);
                             }
                         }
                     }
+                    console.log(`イベント ${event.event_name} の処理完了。利用可能スロット数: ${availableSlotsCount}`);
+                }
+                
+                if (autoReserveEnabledCount === 0) {
+                    console.log('⚠️ 自動予約が有効なイベントがありません');
+                } else {
+                    console.log(`🤖 自動予約処理完了。処理対象イベント数: ${autoReserveEnabledCount}`);
                 }
             }
             
             // 自動予約用の予約実行関数
             async function executeReservationForAutoReserve(cellId) {
+                console.log(`🔄 executeReservationForAutoReserve 開始: ${cellId}`);
+                
                 const scheduleData = window.cellScheduleData && window.cellScheduleData[cellId];
                 if (!scheduleData || scheduleData.length === 0) {
+                    console.log(`❌ スケジュールデータが見つかりません: ${cellId}`);
                     return { success: false, error: 'スケジュールデータが見つかりません' };
                 }
+                
+                console.log(`📊 スケジュールデータ数: ${scheduleData.length}`);
+                scheduleData.forEach((sd, index) => {
+                    console.log(`  [${index}] timeKey: ${sd.timeKey}, startTime: ${sd.startTime}`);
+                });
                 
                 // セルIDから eventIndex を取得
                 const cellIdParts = cellId.split('-');
@@ -1431,6 +1521,7 @@
                 // 選択されたイベント情報を取得
                 const events = window.selectedEventsForSchedule || [];
                 if (eventIndex >= events.length) {
+                    console.log(`❌ イベント情報が見つかりません: eventIndex=${eventIndex}, events.length=${events.length}`);
                     return { success: false, error: 'イベント情報が見つかりません' };
                 }
                 
@@ -1438,16 +1529,22 @@
                 const ticketId = window.savedTicketId || '';
                 const entranceDate = (window.savedEntranceDate || new Date().toISOString().split('T')[0]).replace(/-/g, '');
                 
+                console.log(`🎫 イベント: ${event.event_name} (${event.event_code})`);
+                console.log(`🎫 チケットID: ${ticketId}`);
+                console.log(`📅 入場日: ${entranceDate}`);
+                
                 if (!ticketId.trim()) {
+                    console.log(`❌ チケットIDが設定されていません`);
                     return { success: false, error: 'チケットIDが設定されていません' };
                 }
                 
                 // チケットIDをカンマで分割
                 const ticketIds = ticketId.split(',').map(id => id.trim()).filter(id => id);
+                console.log(`🎫 チケットID配列:`, ticketIds);
                 
                 try {
-                    // 各スケジュールに対してPOST API送信
-                    for (const sd of scheduleData) {
+                    // 各スケジュールに対してPOST API送信（Promise.allで並列実行）
+                    const promises = scheduleData.map(async (sd, index) => {
                         const requestBody = {
                             "ticket_ids": ticketIds,
                             "entrance_date": entranceDate,
@@ -1455,6 +1552,8 @@
                             "event_code": event.event_code,
                             "registered_channel": "5"
                         };
+                        
+                        console.log(`📤 自動予約API送信 [${index + 1}/${scheduleData.length}]:`, requestBody);
                         
                         try {
                             const response = await fetch('https://ticket.expo2025.or.jp/api/d/user_event_reservations', {
@@ -1474,39 +1573,185 @@
                                 body: JSON.stringify(requestBody)
                             });
                             
-                            // HTTPステータスコード200の場合は成功
-                            if (response.status === 200) {
-                                return { success: true, response: response };
+                            let responseData;
+                            try {
+                                responseData = await response.json();
+                            } catch (e) {
+                                responseData = await response.text();
                             }
                             
+                            return {
+                                index: index + 1,
+                                startTime: sd.startTime,
+                                timeKey: sd.timeKey,
+                                status: response.status,
+                                statusText: response.statusText,
+                                success: response.ok,
+                                data: responseData,
+                                requestBody: requestBody
+                            };
+                            
                         } catch (error) {
-                            console.error('自動予約API送信エラー:', error);
+                            return {
+                                index: index + 1,
+                                startTime: sd.startTime,
+                                timeKey: sd.timeKey,
+                                status: 'ERROR',
+                                statusText: 'Network Error',
+                                success: false,
+                                error: error.message,
+                                requestBody: requestBody
+                            };
                         }
+                    });
+                    
+                    // 全てのAPIリクエストの完了を待つ
+                    const results = await Promise.all(promises);
+                    
+                    // 結果をログ形式で表示
+                    const successCount = results.filter(r => r.success).length;
+                    const errorCount = results.filter(r => !r.success).length;
+                    const status200Results = results.filter(r => r.status === 200);
+                    
+                    console.log(`📊 自動予約API結果: 成功=${successCount}件, エラー=${errorCount}件, HTTP200=${status200Results.length}件`);
+                    
+                    // 自動予約用の結果ログ表示エリアを取得または作成
+                    showAutoReserveResults(results, event);
+                    
+                    // HTTPステータスコード200の場合のみ成功として返す
+                    if (status200Results.length > 0) {
+                        console.log(`✅ 自動予約成功: ${status200Results.length}件の予約が完了`);
+                        return { success: true, results: results, successCount: status200Results.length };
+                    } else {
+                        console.log(`❌ 自動予約失敗: HTTP200のレスポンスがありませんでした`);
+                        return { success: false, error: '予約に失敗しました', results: results };
                     }
                     
-                    return { success: false, error: '予約に失敗しました' };
-                    
                 } catch (error) {
+                    console.error('💥 executeReservationForAutoReserve 例外エラー:', error);
                     return { success: false, error: error.message };
                 }
+            }
+            
+            // 自動予約結果の表示関数
+            function showAutoReserveResults(results, event) {
+                // 結果をログ形式で表示
+                const successCount = results.filter(r => r.success).length;
+                const errorCount = results.filter(r => !r.success).length;
+                const status200Results = results.filter(r => r.status === 200);
+                
+                // API結果表示エリアを取得または作成
+                let resultDiv = document.getElementById('api-result');
+                if (!resultDiv) {
+                    // 結果表示エリアが見つからない場合は新しく作成
+                    resultDiv = document.createElement('div');
+                    resultDiv.id = 'api-result';
+                    resultDiv.style.cssText = `
+                        background-color: #f8f9fa;
+                        border: 1px solid #dee2e6;
+                        border-radius: 4px;
+                        padding: 10px;
+                        margin: 10px;
+                        font-family: monospace;
+                        font-size: 12px;
+                        text-align: left;
+                        max-height: 300px;
+                        overflow-y: auto;
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 80%;
+                        max-width: 800px;
+                        z-index: 10003;
+                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                    `;
+                    document.body.appendChild(resultDiv);
+                    
+                    // 閉じるボタンを追加
+                    const closeButton = document.createElement('button');
+                    closeButton.textContent = '×';
+                    closeButton.style.cssText = `
+                        position: absolute;
+                        top: 5px;
+                        right: 5px;
+                        background: #dc3545;
+                        color: white;
+                        border: none;
+                        width: 25px;
+                        height: 25px;
+                        border-radius: 50%;
+                        cursor: pointer;
+                        font-size: 14px;
+                    `;
+                    closeButton.onclick = () => {
+                        if (resultDiv.parentNode) {
+                            resultDiv.parentNode.removeChild(resultDiv);
+                        }
+                    };
+                    resultDiv.appendChild(closeButton);
+                }
+                
+                // 結果HTML生成（自動予約用）
+                const now = new Date();
+                const timestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+                
+                let resultsHTML = `<div style="color: ${errorCount === 0 ? '#28a745' : '#dc3545'}; font-weight: bold; margin-bottom: 10px;">
+                    🤖 自動予約API（POST）送信結果 [${timestamp}]: ${errorCount === 0 ? '✓ 全て成功' : '⚠ 一部エラー'} (成功: ${successCount}件, エラー: ${errorCount}件)
+                </div>`;
+                
+                resultsHTML += `<div style="margin-bottom: 10px; padding: 5px; background-color: #e3f2fd; border-radius: 3px; border-left: 3px solid #2196f3;">
+                    <div style="font-weight: bold; color: #333;">🎫 対象イベント: ${event.event_name} (${event.event_code})</div>
+                </div>`;
+                
+                results.forEach((result) => {
+                    const statusColor = result.success ? '#28a745' : '#dc3545';
+                    resultsHTML += `<div style="margin-bottom: 8px; padding: 5px; background-color: white; border-radius: 3px; border-left: 3px solid ${statusColor};">
+                        <div style="font-weight: bold; color: #333; margin-bottom: 2px;">
+                            [${result.index}] 自動予約POST ${result.success ? '✓' : '✗'} ${result.startTime} (${result.timeKey}) - ${result.status} ${result.statusText}
+                        </div>
+                        <div style="font-size: 10px; color: #666; margin-bottom: 3px;">POSTリクエスト:</div>
+                        <div style="font-size: 10px; max-height: 60px; overflow-y: auto; background-color: #f8f9fa; padding: 3px; border-radius: 2px; margin-bottom: 3px;">
+                            <pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">${JSON.stringify(result.requestBody, null, 2)}</pre>
+                        </div>
+                        <div style="font-size: 10px; color: #666; margin-bottom: 3px;">${result.success ? 'レスポンス:' : 'エラー:'}</div>
+                        <div style="font-size: 10px; max-height: 80px; overflow-y: auto; background-color: #f8f9fa; padding: 3px; border-radius: 2px;">
+                            <pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">${JSON.stringify(result.data || result.error, null, 2)}</pre>
+                        </div>
+                    </div>`;
+                });
+                
+                resultDiv.innerHTML = `<div style="padding-right: 30px;">${resultsHTML}</div>`;
+                resultDiv.style.display = 'block';
             }
             
             // 全ての自動予約チェックを外す関数
             function clearAllAutoReserveStates() {
                 const events = window.selectedEventsForSchedule || [];
                 
+                console.log('🔄 全ての自動予約チェックを無効化中...');
+                
                 // グローバル状態をクリア
                 window.autoReserveStates = {};
+                
+                // ローカルストレージも更新
+                try {
+                    localStorage.setItem('autoReserveStates', JSON.stringify(window.autoReserveStates));
+                    console.log('💾 自動予約状態をローカルストレージから削除しました');
+                } catch (e) {
+                    console.warn('自動予約状態の削除に失敗:', e);
+                }
                 
                 // UIのチェックボックスをクリア
                 events.forEach((event, eventIndex) => {
                     const checkbox = document.getElementById(`auto-reserve-${eventIndex}`);
                     if (checkbox) {
                         checkbox.checked = false;
+                        console.log(`✅ チェックボックス無効化: ${event.event_name} (index=${eventIndex})`);
                     }
                 });
                 
-                console.log('全ての自動予約チェックを無効にしました');
+                console.log('✅ 全ての自動予約チェックを無効にしました');
             }
             
             // スケジュールをクリックしたときの予約API送信関数
