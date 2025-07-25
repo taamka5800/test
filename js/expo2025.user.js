@@ -41,7 +41,7 @@
                 padding: 0;
                 min-width: 350px;
                 max-width: 80%;
-                max-height: 80vh;
+                max-height: 85vh;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
@@ -530,7 +530,7 @@
                 padding: 0;
                 min-width: 400px;
                 max-width: 80%;
-                max-height: 80vh;
+                max-height: 85vh;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
@@ -1803,7 +1803,7 @@
                 padding: 0;
                 min-width: 400px;
                 max-width: 90%;
-                max-height: 80vh;
+                max-height: 85vh;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
